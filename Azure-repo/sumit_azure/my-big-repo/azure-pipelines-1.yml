@@ -1,0 +1,86 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+ 
+parameters:
+- name: scanningreq
+  displayName: scanning reqyired
+  type: string
+  values: 
+  - true
+  - false
+   
+variables:     
+  my-dir: '$(System.DefaultWorkingDirectory)/terraform'
+  svc: 'MyNewSVC'
+
+
+
+jobs:
+- job: initwa_scanwa_planwa
+  displayName: initwa scanwa planwa
+  pool: Agent-Ka-Jhund
+  steps: 
+  - task: TerraformTask@5
+    inputs:
+      provider: 'azurerm'
+      command: 'init'
+      workingDirectory: $(my-dir)
+      backendServiceArm: $(svc)
+      backendAzureRmStorageAccountName: 'stg131311'
+      backendAzureRmContainerName: 'tfstate'
+      backendAzureRmKey: 'katty.tfstate'
+  - task: TerraformTask@5
+    displayName: 'Terraform Fmt'
+    inputs:
+     provider: 'azurerm'
+     command: 'custom'
+     workingDirectory: $(my-dir)
+     outputTo: 'console'
+     customCommand: 'fmt'
+     environmentServiceNameAzureRM: $(svc)
+  - task: tfsec@1
+    displayName: scanning-req
+    condition: eq(${{ parameters.scanningreq }}, true)
+    inputs:
+       version: 'v1.26.0'
+       dir: '$(System.DefaultWorkingDirectory)/terraform'
+
+
+  - task: TerraformTask@5
+    displayName: plan
+    inputs:
+      provider: 'azurerm'
+      command: 'plan'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+      environmentServiceNameAzureRM: 'MyNewSVC'
+- job: Manual_validation
+  displayName: Manual_validation
+  pool: server
+  steps:
+  - task: ManualValidation@1
+    inputs:
+      notifyUsers: 'snl.dby@gmail.com'
+      approvers: 'snl.dby@gmail.com'
+- job: apply
+  displayName: Apply
+  pool: Agent-Ka-Jhund
+  dependsOn: Manual_validation
+  steps:
+  - task: TerraformTask@5
+    inputs:
+      provider: 'azurerm'
+      command: 'init'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+      backendServiceArm: 'MyNewSVC'
+      backendAzureRmStorageAccountName: 'stg131311'
+      backendAzureRmContainerName: 'tfstate'
+      backendAzureRmKey: 'katty.tfstate'
+  - task: TerraformTask@5
+    inputs:
+      provider: 'azurerm'
+      command: 'apply'
+      workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+      environmentServiceNameAzureRM: 'MyNewSVC'

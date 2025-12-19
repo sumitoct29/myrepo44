@@ -1,0 +1,72 @@
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+ 
+# parameters:
+# - name: scanningreq
+#   displayName: scanning reqyired
+#   type: string
+#   values: 
+#   - true
+#   - false
+   
+variables:     
+  my-dir: '$(System.DefaultWorkingDirectory)/terraform'
+  svc: 'MyNewSVC'
+
+
+pool:
+  name: Agent-Ka-Jhund
+
+
+
+
+steps:
+- task: TerraformTask@5
+  displayName: 'Terraform Fmt'
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    workingDirectory: $(my-dir)
+    backendServiceArm: $(svc)
+    backendAzureRmStorageAccountName: 'stg131311'
+    backendAzureRmContainerName: 'tfstate'
+    backendAzureRmKey: 'katty.tfstate'
+
+
+
+
+- task: TerraformTask@5
+  displayName: 'Terraform Fmt'
+  inputs:
+    provider: 'azurerm'
+    command: 'custom'
+    workingDirectory: $(my-dir)
+    outputTo: 'console'
+    customCommand: 'fmt'
+    environmentServiceNameAzureRM: $(svc)
+
+- task: tfsec@1
+  displayName: scanning-req
+  inputs:
+    version: 'v1.26.0'
+    dir: $(my-dir)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Plan'
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    workingDirectory: $(my-dir)
+    environmentServiceNameAzureRM: $(svc)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Apply'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    workingDirectory: $(my-dir)
+    environmentServiceNameAzureRM: $(svc)

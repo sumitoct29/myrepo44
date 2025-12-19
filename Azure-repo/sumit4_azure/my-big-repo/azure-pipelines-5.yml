@@ -1,0 +1,39 @@
+trigger:
+  branches:
+    include:
+      - feature/*       # Auto trigger on feature branches
+
+pool: Agent-Ka-Jhund
+
+variables:
+  use_var: "$(System.DefaultWorkingDirectory)/terraform"
+  svc_connection: "workload-identity"
+
+steps:
+- task: TerraformTask@5
+  displayName: 'Terraform Init'
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    workingDirectory: $(use_var)
+    backendServiceArm: $(svc_connection)
+    backendAzureRmStorageAccountName: 'stg1313'
+    backendAzureRmContainerName: 'tfstate'
+    backendAzureRmKey: 'kat.tfstate'
+
+- task: TerraformTask@5
+  displayName: 'Terraform Plan'
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    workingDirectory: $(use_var)
+    environmentServiceNameAzureRM: $(svc_connection)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Apply'
+  condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))   # Apply only on main
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    workingDirectory: $(use_var)
+    environmentServiceNameAzureRM: $(svc_connection)

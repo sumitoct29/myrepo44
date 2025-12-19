@@ -1,0 +1,50 @@
+trigger:
+  branches:
+    include:
+      - '*'  # All branches including main
+
+pool:
+  name: Agent-Ka-Jhund
+
+variables:
+  main_path: '$(System.DefaultWorkingDirectory)/terraform'
+  svc_conn: 'workload-identity'
+
+steps:
+- task: TerraformTask@5
+  displayName: 'Terraform Init'
+  inputs:
+    provider: 'azurerm'
+    command: 'init'
+    backendServiceArm: $(svc_conn)
+    backendAzureRmStorageAccountName: 'stg1313'
+    backendAzureRmContainerName: 'tfstate'
+    backendAzureRmKey: 'kat.tfstate'
+    workingDirectory: $(main_path)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Fmt'
+  inputs:
+    provider: 'azurerm'
+    command: 'custom'
+    workingDirectory: $(main_path)
+    outputTo: 'console'
+    customCommand: 'fmt'
+    environmentServiceNameAzureRM: $(svc_conn)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Plan'
+  inputs:
+    provider: 'azurerm'
+    command: 'plan'
+    workingDirectory: $(main_path)
+    environmentServiceNameAzureRM: $(svc_conn)
+
+- task: TerraformTask@5
+  displayName: 'Terraform Apply'
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  inputs:
+    provider: 'azurerm'
+    command: 'apply'
+    workingDirectory: $(main_path)
+    environmentServiceNameAzureRM: $(svc_conn)
